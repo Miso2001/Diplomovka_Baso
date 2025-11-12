@@ -1,3 +1,156 @@
+%-------------------------- PARAMETERS OF OSA --------------------------------
+
+start_wavelength=1500;            % [nm] Rozsah: <600..1750> nm
+stop_wavelength=1550.0;             % [nm] Rozsah: <600..1750> nm
+sample_points =10001;                % Počet bodov: 51 | 101 | ... | 10001 | ...
+resolution = 0.07;                  % [nm] Rozlišovacia šírka pásma: 0.07 | 0.1 | 0.2 | 0.5 | 1.0
+video_bandwith= 1000;               % [Hz] Video šírka pásma: 10 | 100 | ... | 1000000
+reference_level = -20;              % [dBm] Referenčná úroveň: <-90...30>
+log_scale_div =5;                   % [dB/div] Vertikálna stupnica: <0.1...10>
+sweep_average_count = 20;            % Počet spriemerovaní: <1...1000>
+storage_mode = 'OFF';               % Režim ukladania stopy: AVS | OFF (AVS = Average)
+active_trace = 'A';                 % Aktívna stopa: A...J
+trace_type = 'WRITE';               % Typ stopy: BLANK|CALC|FIX|WRITE
+
+span = stop_wavelength - start_wavelength; % Vypočítaný span
+
+%-------------------------- COMMUNICATION WITH OSA -----------------------------
+
+instrument_OSA = visadev("GPIB0::1::INSTR");
+instrument_OSA.Timeout=1000;        % Nastavenie dlhého timeoutu pre dlhé merania (100 sek)
+idn_OSA=writeread(instrument_OSA,"*IDN?"); % Získanie IDN reťazca
+disp(['OSA pripojená: ', idn_OSA]);
+
+%-------------------------- INIT OSA --------------------------------------
+
+osa_set_wavelength_range(instrument_OSA,start_wavelength,stop_wavelength);  
+osa_set_sample_points(instrument_OSA,sample_points);  
+osa_set_resolution(instrument_OSA,resolution); 
+osa_set_video_bandwith(instrument_OSA,video_bandwith);
+osa_set_ref_level(instrument_OSA,reference_level);
+osa_set_scale_div(instrument_OSA,log_scale_div);
+osa_set_sweep_average_count(instrument_OSA,sweep_average_count);
+osa_select_storage_mode(instrument_OSA,active_trace,storage_mode);
+osa_trace_select(instrument_OSA,active_trace);
+osa_set_trace_type(instrument_OSA,active_trace,trace_type);
+
+%-------------------------- OSA CONTROL FUNCTIONS --------------------------------
+
+function [] = osa_set_wavelength_range(instrument, start_wl, stop_wl)
+    
+    if start_wl >= stop_wl
+        disp("ERROR: START WL >= STOP WL");
+        return
+    end
+
+    % 1. Načítanie aktuálnych nastavení
+    actual_start_wl_str = writeread(instrument, 'STA?');   
+    actual_start_wl = sscanf(actual_start_wl_str, '%f');
+    actual_stop_wl_str = writeread(instrument, 'STO?');   
+    actual_stop_wl = sscanf(actual_stop_wl_str, '%f');
+    
+    % 2. Logika poradia nastavenia
+    if start_wl >= actual_stop_wl
+   
+        command_stop = append('STO ', num2str(stop_wl));
+        writeline(instrument, command_stop);
+        writeline(instrument, '*OPC?'); % Čakáme na dokončenie operácie
+        fscanf(instrument);
+
+        command_start = append('STA ', num2str(start_wl));
+        writeline(instrument, command_start);
+        writeline(instrument, '*OPC?');
+        fscanf(instrument);
+        return
+    end
+
+    command_start = append('STA ', num2str(start_wl));
+    writeline(instrument, command_start);
+    writeline(instrument, '*OPC?');
+    fscanf(instrument);
+
+    command_stop = append('STO ', num2str(stop_wl));
+    writeline(instrument, command_stop);
+    writeline(instrument, '*OPC?');
+    fscanf(instrument);
+
+    disp(['OSA Wavelength Range set to: ', num2str(start_wl), 'nm - ', num2str(stop_wl), 'nm']);
+end
+
+function [] = osa_set_sample_points(instrument, sample_points)
+    command = append('MPT ', int2str(sample_points)); % MPT = Measurement Points
+    writeline(instrument, command);
+    writeline(instrument, '*OPC?'); % *OPC? príkaz povie prístroju, aby poslal správu
+    fscanf(instrument);              % fscanf čaká na túto správu
+end
+
+function [] = osa_set_resolution(instrument, resolution)
+    command = append('RES ', num2str(resolution));
+    writeline(instrument, command);
+    writeline(instrument, '*OPC?');
+    fscanf(instrument);
+end
+
+function [] = osa_set_video_bandwith(instrument, bandwith)
+    command = append('VBW ', int2str(bandwith)); 
+    writeline(instrument, command);          
+    writeline(instrument, '*OPC?');
+    fscanf(instrument);                     
+    disp(['OSA Video Bandwidth set to: ', int2str(bandwith), ' Hz']);
+end
+
+function [] = osa_set_ref_level(instrument, ref_level)
+    command = append('RLV ', num2str(ref_level));
+    writeline(instrument, command);         
+    writeline(instrument, '*OPC?');
+    fscanf(instrument);                     
+    disp(['OSA Reference Level set to: ', num2str(ref_level), ' dBm']);
+end
+
+function [] = osa_set_scale_div(instrument, scalediv)
+    command = append('LOG ', num2str(scalediv)); % LOG = Log Scale Division (dB/div)
+    writeline(instrument, command);          % set scale div
+    writeline(instrument, '*OPC?');
+    fscanf(instrument);                     % wait for operation complete
+    disp(['OSA Log Scale Division set to: ', num2str(scalediv), ' dB/div']);
+end
+
+function [] = osa_set_sweep_average_count(instrument, count)
+    command = append('AVS ', int2str(count)); % AVS = Average Count
+    writeline(instrument, command);         % set sweep avg count
+    writeline(instrument, '*OPC?');
+    fscanf(instrument);                    % wait for operation complete
+    disp(['OSA Sweep Average Count set to: ', int2str(count)]);
+end
+
+function [] = osa_select_storage_mode(instrument, active_trace, storage_mode)
+    % storage_mode: AVS | MAX | MIN | OFF | OVL
+    command = append('SMD ', active_trace, ',', storage_mode); % SMD = Storage Mode
+    writeline(instrument, command);     
+    writeline(instrument, '*OPC?');
+    fscanf(instrument);                % wait for operation complete
+    disp(['OSA Trace ', active_trace, ' Storage Mode set to: ', storage_mode]);
+end
+
+function [] = osa_trace_select(instrument, trace)
+    command = append('TSL ', trace); % TSL = Trace Select
+    writeline(instrument, command);     
+    writeline(instrument, '*OPC?');
+    fscanf(instrument);                % wait for operation complete
+    disp(['OSA Active Trace set to: ', trace]);
+end
+
+function [] = osa_set_trace_type(instrument, trace, trace_type)
+    % trace_type: BLANK | CAL| FIX | WRITE
+    command = append('TTP ', trace, ',', trace_type); % TTP = Trace Type
+    writeline(instrument, command);     
+    writeline(instrument, '*OPC?');
+    fscanf(instrument);                % wait for operation complete
+    disp(['OSA Trace ', trace, ' Type set to: ', trace_type]);
+end
+
+%--------------------------------- SAVING DATA -----------------------------------
+
 function [] = save_osa_settings(logfile_name, start_wl, stop_wl, resolution, ref_level, sweep_avg_count)
     fileID = fopen(logfile_name, 'w'); 
     
