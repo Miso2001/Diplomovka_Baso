@@ -80,8 +80,8 @@ end
 function [] = osa_set_sample_points(instrument, sample_points)
     command = append('MPT ', int2str(sample_points)); % MPT = Measurement Points
     writeline(instrument, command);
-    writeline(instrument, '*OPC?'); % *OPC? príkaz povie prístroju, aby poslal správu
-    fscanf(instrument);              % fscanf čaká na túto správu
+    writeline(instrument, '*OPC?'); 
+    fscanf(instrument);             
 end
 
 function [] = osa_set_resolution(instrument, resolution)
@@ -108,44 +108,44 @@ function [] = osa_set_ref_level(instrument, ref_level)
 end
 
 function [] = osa_set_scale_div(instrument, scalediv)
-    command = append('LOG ', num2str(scalediv)); % LOG = Log Scale Division (dB/div)
-    writeline(instrument, command);          % set scale div
+    command = append('LOG ', num2str(scalediv)); 
+    writeline(instrument, command);         
     writeline(instrument, '*OPC?');
-    fscanf(instrument);                     % wait for operation complete
+    fscanf(instrument);                     
     disp(['OSA Log Scale Division set to: ', num2str(scalediv), ' dB/div']);
 end
 
 function [] = osa_set_sweep_average_count(instrument, count)
-    command = append('AVS ', int2str(count)); % AVS = Average Count
-    writeline(instrument, command);         % set sweep avg count
+    command = append('AVS ', int2str(count));
+    writeline(instrument, command);         
     writeline(instrument, '*OPC?');
-    fscanf(instrument);                    % wait for operation complete
+    fscanf(instrument);                    
     disp(['OSA Sweep Average Count set to: ', int2str(count)]);
 end
 
 function [] = osa_select_storage_mode(instrument, active_trace, storage_mode)
     % storage_mode: AVS | MAX | MIN | OFF | OVL
-    command = append('SMD ', active_trace, ',', storage_mode); % SMD = Storage Mode
+    command = append('SMD ', active_trace, ',', storage_mode); 
     writeline(instrument, command);     
     writeline(instrument, '*OPC?');
-    fscanf(instrument);                % wait for operation complete
+    fscanf(instrument);                
     disp(['OSA Trace ', active_trace, ' Storage Mode set to: ', storage_mode]);
 end
 
 function [] = osa_trace_select(instrument, trace)
-    command = append('TSL ', trace); % TSL = Trace Select
+    command = append('TSL ', trace); 
     writeline(instrument, command);     
     writeline(instrument, '*OPC?');
-    fscanf(instrument);                % wait for operation complete
+    fscanf(instrument);               
     disp(['OSA Active Trace set to: ', trace]);
 end
 
 function [] = osa_set_trace_type(instrument, trace, trace_type)
     % trace_type: BLANK | CAL| FIX | WRITE
-    command = append('TTP ', trace, ',', trace_type); % TTP = Trace Type
+    command = append('TTP ', trace, ',', trace_type);
     writeline(instrument, command);     
     writeline(instrument, '*OPC?');
-    fscanf(instrument);                % wait for operation complete
+    fscanf(instrument);               
     disp(['OSA Trace ', trace, ' Type set to: ', trace_type]);
 end
 
@@ -190,4 +190,5 @@ function [] = save_measurement_data(filename, x_data, y_data)
     
     fclose(fileID);
     disp(['Namerané dáta uložené do: ', filename]);
+
 end
