@@ -1,3 +1,6 @@
+
+clc;
+clear;
 %-------------------------- PARAMETERS OF OSA --------------------------------
 
 start_wavelength=1500;            % [nm] Rozsah: <600..1750> nm
@@ -17,9 +20,14 @@ span = stop_wavelength - start_wavelength; % Vypočítaný span
 %-------------------------- COMMUNICATION WITH OSA -----------------------------
 
 instrument_OSA = visadev("GPIB0::1::INSTR");
-instrument_OSA.Timeout=1000;        % Nastavenie dlhého timeoutu pre dlhé merania (100 sek)
-idn_OSA=writeread(instrument_OSA,"*IDN?"); % Získanie IDN reťazca
+instrument_OSA.Timeout=1000;        % Nastavenie dlhého timeoutu (100 sek)
+idn_OSA=writeread(instrument_OSA,"*IDN?");
 disp(['OSA pripojená: ', idn_OSA]);
+
+instrument_OSICS = visadev("GPIB0::20::INSTR");
+instrument_OSICS.Timeout=20;       % timeout 20 sek for OSICS
+idn_OSICS=writeread(instrument_OSICS,"*IDN?");
+
 
 %-------------------------- INIT OSA --------------------------------------
 
@@ -33,6 +41,27 @@ osa_set_sweep_average_count(instrument_OSA,sweep_average_count);
 osa_select_storage_mode(instrument_OSA,active_trace,storage_mode);
 osa_trace_select(instrument_OSA,active_trace);
 osa_set_trace_type(instrument_OSA,active_trace,trace_type);
+
+
+
+%-------------------------- MEASUREMENT --------------------------------------
+ tic
+    if storage_mode == 'OFF'
+        osa_start_measurement(instrument_OSA);
+    end
+    if storage_mode == 'AVS'
+        osa_start_measurement_with_sweep_averaging(instrument_OSA);
+    end
+    toc
+
+    y_data = osa_get_trace_data(instrument_OSA,active_trace);
+    
+    x_data=start_wavelength:(span/(sample_points-1)):stop_wavelength;
+        
+    plot(x_data,y_data, 'LineWidth',1)
+    %yline(-64,'--r','Cut level')
+    xlabel('vlnova dlzka [nm]')
+    ylabel('vykon [dBm]')
 
 %-------------------------- OSA CONTROL FUNCTIONS --------------------------------
 
@@ -147,8 +176,25 @@ function [] = osa_set_trace_type(instrument, trace, trace_type)
     writeline(instrument, '*OPC?');
     fscanf(instrument);               
     disp(['OSA Trace ', trace, ' Type set to: ', trace_type]);
+end   
+
+function [] = osa_start_measurement(instrument)
+    disp("start measurement...please wait");
+    writeline(instrument,'SSI');            % start single measurement
+    writeline(instrument,'*OPC?');
+    fscanf(instrument);                     % wait for operation complete
+    disp("measurement finished.");
 end
 
+function y_data = osa_get_trace_data(instrument,trace)
+    instrument.flush();                      % clear all buffers
+    command=append('DB',trace,'?');          % DBA? | DBB? | DBC? ...
+    writeline(instrument,command);           % query trace data binary
+    y_data=readbinblock(instrument,"double");
+%   y_data=round(y_data,2);
+    writeline(instrument,'*OPC?');
+    fscanf(instrument);                      % wait for operation complete
+end
 %--------------------------------- SAVING DATA -----------------------------------
 
 function [] = save_osa_settings(logfile_name, start_wl, stop_wl, resolution, ref_level, sweep_avg_count)
