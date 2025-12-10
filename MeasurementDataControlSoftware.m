@@ -57,6 +57,12 @@ osa_set_trace_type(instrument_OSA,active_trace,trace_type);
     y_data = osa_get_trace_data(instrument_OSA,active_trace);
     
     x_data=start_wavelength:(span/(sample_points-1)):stop_wavelength;
+
+    settings_filename = 'OSA_Settings.txt';
+    data_filename = 'Measurement_data.csv';
+
+    save_osa_settings(settings_filename, start_wavelength, stop_wavelength, resolution, reference_level, sweep_average_count);
+    save_measurement_data(data_filename, x_data, y_data);
         
     plot(x_data,y_data, 'LineWidth',1)
     %yline(-64,'--r','Cut level')
@@ -224,7 +230,7 @@ function [] = save_measurement_data(filename, x_data, y_data)
         error('Nepodarilo sa otvoriť súbor %s', filename);
     end
     
-    fprintf(fileID, 'Timestamp: %s\n', string(datetime('now'), 'yyyy-MM-dd HH:mm:ss.FFF'));
+    % fprintf(fileID, 'Timestamp: %s\n', string(datetime('now'), 'yyyy-MM-dd HH:mm:ss.FFF'));
     fprintf(fileID, 'Wavelength [nm],Power [dBm]\n');
     
     if length(x_data) ~= length(y_data)
