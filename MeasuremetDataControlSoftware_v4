@@ -1,0 +1,198 @@
+function main_measurement()
+    clc;
+    clear;
+
+    start_wavelength = 1500; [cite: 1, 2]
+    stop_wavelength = 1550.0; [cite: 3]
+    sample_points = 10001;              
+    resolution = 0.07; [cite: 4]
+    video_bandwith = 1000;              
+    reference_level = -20; [cite: 5]
+    log_scale_div = 5;                  
+    sweep_average_count = 20; [cite: 6]
+    storage_mode = 'OFF';               
+    active_trace = 'A';                 
+    trace_type = 'WRITE'; [cite: 7, 8]
+
+    span = stop_wavelength - start_wavelength;
+
+    instrument_OSA = visadev("GPIB0::1::INSTR"); [cite: 9]
+    instrument_OSA.Timeout = 1000;
+    idn_OSA = writeread(instrument_OSA, "*IDN?"); [cite: 9]
+    disp(['OSA pripojená: ', idn_OSA]); [cite: 10]
+
+    instrument_OSICS = visadev("GPIB0::20::INSTR"); [cite: 10]
+    instrument_OSICS.Timeout = 20;
+    idn_OSICS = writeread(instrument_OSICS, "*IDN?");
+
+    osa_set_wavelength_range(instrument_OSA, start_wavelength, stop_wavelength);  [cite: 11]
+    osa_set_sample_points(instrument_OSA, sample_points);  
+    osa_set_resolution(instrument_OSA, resolution); 
+    osa_set_video_bandwith(instrument_OSA, video_bandwith);
+    osa_set_ref_level(instrument_OSA, reference_level);
+    osa_set_scale_div(instrument_OSA, log_scale_div); [cite: 11]
+    osa_set_sweep_average_count(instrument_OSA, sweep_average_count); [cite: 12]
+    osa_select_storage_mode(instrument_OSA, active_trace, storage_mode);
+    osa_trace_select(instrument_OSA, active_trace);
+    osa_set_trace_type(instrument_OSA, active_trace, trace_type); [cite: 12]
+
+    tic
+    if strcmp(storage_mode, 'OFF')
+        osa_start_measurement(instrument_OSA); [cite: 13]
+    end
+    if strcmp(storage_mode, 'AVS')
+        osa_start_measurement_with_sweep_averaging(instrument_OSA); [cite: 14]
+    end
+    toc
+
+    y_data = osa_get_trace_data(instrument_OSA, active_trace); [cite: 15]
+    x_data = start_wavelength:(span/(sample_points-1)):stop_wavelength; [cite: 15]
+
+    mask = y_data > -60;
+    if any(mask)
+        x_filtered = x_data(mask);
+        y_filtered = y_data(mask);
+        weights = y_filtered - min(y_filtered); 
+        centroid_x = sum(x_filtered .* weights) / sum(weights);
+        centroid_y = max(y_filtered);
+        
+        fprintf('\n--- ANALÝZA MAXIMA ---\n');
+        fprintf('Centroid X (vlnová dĺžka): %.6f nm\n', centroid_x);
+        fprintf('Maximum Y (výkon): %.3f dBm\n', centroid_y);
+        fprintf('----------------------\n\n');
+    end
+
+    timestamp = datestr(now, 'yyyymmdd_HHMMSS'); [cite: 16]
+    settings_filename = ['OSA_Settings_', timestamp, '.txt']; [cite: 16]
+    data_filename = ['Measurement_data_', timestamp, '.csv']; [cite: 17]
+
+    save_osa_settings(settings_filename, start_wavelength, stop_wavelength, resolution, reference_level, sweep_average_count); [cite: 17]
+    save_measurement_data(data_filename, x_data, y_data); [cite: 18]
+        
+    p = plot(x_data, y_data, 'LineWidth', 1); [cite: 18]
+    row = dataTipTextRow('Vlnová dĺžka','%{+.3f} nm'); [cite: 18]
+    p.DataTipTemplate.DataTipRows(1) = row;
+    p.DataTipTemplate.DataTipRows(2).Format = '%{+.3f} dBm'; [cite: 19]
+    xlabel('vlnova dlzka [nm]')
+    ylabel('vykon [dBm]')
+    title(['Súbor: ', data_filename], 'Interpreter', 'none'); [cite: 19]
+end 
+
+function [] = osa_set_wavelength_range(instrument, start_wl, stop_wl) [cite: 20]
+    if start_wl >= stop_wl
+        disp("ERROR: START WL >= STOP WL"); [cite: 20]
+        return [cite: 21]
+    end
+    actual_start_wl_str = writeread(instrument, 'STA?');   
+    actual_stop_wl_str = writeread(instrument, 'STO?');   
+    actual_stop_wl = sscanf(actual_stop_wl_str, '%f'); [cite: 21]
+    if start_wl >= actual_stop_wl
+        writeline(instrument, append('STO ', num2str(stop_wl))); [cite: 22]
+        writeread(instrument, '*OPC?');
+        writeline(instrument, append('STA ', num2str(start_wl))); [cite: 23]
+        writeread(instrument, '*OPC?');
+    else
+        writeline(instrument, append('STA ', num2str(start_wl))); [cite: 23]
+        writeread(instrument, '*OPC?');
+        writeline(instrument, append('STO ', num2str(stop_wl))); [cite: 24]
+        writeread(instrument, '*OPC?');
+    end
+    disp(['OSA Wavelength Range set to: ', num2str(start_wl), 'nm - ', num2str(stop_wl), 'nm']); [cite: 24]
+end [cite: 25]
+
+function [] = osa_set_sample_points(instrument, sample_points) [cite: 25]
+    writeline(instrument, append('MPT ', int2str(sample_points)));
+    writeread(instrument, '*OPC?'); [cite: 25]
+end [cite: 26]
+
+function [] = osa_set_resolution(instrument, resolution) [cite: 26]
+    writeline(instrument, append('RES ', num2str(resolution)));
+    writeread(instrument, '*OPC?'); [cite: 26]
+end [cite: 27]
+
+function [] = osa_set_video_bandwith(instrument, bandwith) [cite: 27]
+    writeline(instrument, append('VBW ', int2str(bandwith)));          
+    writeread(instrument, '*OPC?'); [cite: 27]
+    disp(['OSA Video Bandwidth set to: ', int2str(bandwith), ' Hz']); [cite: 28]
+end
+
+function [] = osa_set_ref_level(instrument, ref_level) [cite: 28]
+    writeline(instrument, append('RLV ', num2str(ref_level))); [cite: 28]
+    writeread(instrument, '*OPC?'); [cite: 29]
+    disp(['OSA Reference Level set to: ', num2str(ref_level), ' dBm']); [cite: 29]
+end [cite: 30]
+
+function [] = osa_set_scale_div(instrument, scalediv) [cite: 30]
+    writeline(instrument, append('LOG ', num2str(scalediv)));         
+    writeread(instrument, '*OPC?'); [cite: 30]
+    disp(['OSA Log Scale Division set to: ', num2str(scalediv), ' dB/div']); [cite: 31]
+end [cite: 32]
+
+function [] = osa_set_sweep_average_count(instrument, count) [cite: 32]
+    writeline(instrument, append('AVS ', int2str(count)));         
+    writeread(instrument, '*OPC?'); [cite: 32]
+    disp(['OSA Sweep Average Count set to: ', int2str(count)]); [cite: 33]
+end
+
+function [] = osa_select_storage_mode(instrument, active_trace, storage_mode) [cite: 33]
+    writeline(instrument, append('SMD ', active_trace, ',', storage_mode)); [cite: 33]
+    writeread(instrument, '*OPC?'); [cite: 34]
+    disp(['OSA Trace ', active_trace, ' Storage Mode set to: ', storage_mode]); [cite: 34]
+end [cite: 35]
+
+function [] = osa_trace_select(instrument, trace) [cite: 35]
+    writeline(instrument, append('TSL ', trace));     
+    writeread(instrument, '*OPC?'); [cite: 35]
+    disp(['OSA Active Trace set to: ', trace]); [cite: 36]
+end
+
+function [] = osa_set_trace_type(instrument, trace, trace_type) [cite: 36]
+    writeline(instrument, append('TTP ', trace, ',', trace_type)); [cite: 36]
+    writeread(instrument, '*OPC?'); [cite: 37]
+    disp(['OSA Trace ', trace, ' Type set to: ', trace_type]); [cite: 37]
+end [cite: 38]
+
+function [] = osa_start_measurement(instrument) [cite: 38]
+    disp("start measurement...please wait");
+    writeline(instrument,'SSI');            
+    writeread(instrument,'*OPC?');
+    disp("measurement finished."); [cite: 38]
+end [cite: 39]
+
+function y_data = osa_get_trace_data(instrument,trace) [cite: 39]
+    instrument.flush();                      
+    writeline(instrument, append('DB',trace,'?'));           
+    y_data = readbinblock(instrument,"double");
+    writeread(instrument,'*OPC?'); [cite: 39]
+end [cite: 40]
+
+function [] = save_osa_settings(logfile_name, start_wl, stop_wl, resolution, ref_level, sweep_avg_count) [cite: 40]
+    fileID = fopen(logfile_name, 'w'); [cite: 40]
+    if fileID == -1 [cite: 41]
+        error('Nepodarilo sa otvoriť súbor %s', logfile_name); [cite: 41]
+    end [cite: 42]
+    fprintf(fileID, '--- OSA Configuration Settings ---\n');
+    fprintf(fileID, 'Date and Time: %s\n\n', datestr(now)); [cite: 42]
+    fprintf(fileID, 'Start Wavelength [nm]: %f\n', start_wl); [cite: 43]
+    fprintf(fileID, 'Stop Wavelength [nm]: %f\n', stop_wl);
+    fprintf(fileID, 'Resolution [nm]: %f\n', resolution); [cite: 43]
+    fprintf(fileID, 'Reference Level [dBm]: %f\n', ref_level); [cite: 44]
+    fprintf(fileID, 'Sweep Average Count: %d\n', sweep_avg_count); 
+    fclose(fileID); [cite: 44]
+    disp(['Nastavenia uložené do: ', logfile_name]); [cite: 45]
+end [cite: 45]
+
+function [] = save_measurement_data(filename, x_data, y_data) [cite: 45]
+    fileID = fopen(filename, 'w'); [cite: 45]
+    if fileID == -1 [cite: 46]
+        error('Nepodarilo sa otvoriť súbor %s', filename); [cite: 46]
+    end [cite: 47]
+    fprintf(fileID, 'Wavelength [nm],Power [dBm]\n');
+    if length(x_data) ~= length(y_data)
+        error('Polia vlnovej dĺžky a výkonu nemajú rovnakú dĺžku.'); [cite: 47]
+    end [cite: 48]
+    data_matrix = [x_data(:), y_data(:)]'; 
+    fprintf(fileID, '%6.6f,%6.6f\n', data_matrix); [cite: 48]
+    fclose(fileID);
+    disp(['Namerané dáta uložené do: ', filename]);
+end
