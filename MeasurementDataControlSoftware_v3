@@ -45,8 +45,7 @@ function main_measurement()
         osa_start_measurement(instrument_OSA);
     end
     if strcmp(storage_mode, 'AVS')
-        % Poznámka: v pôvodnom kóde chýbala definícia tejto funkcie, 
-        % predpokladám, že ju máte externe alebo pridáte neskôr
+        
         osa_start_measurement_with_sweep_averaging(instrument_OSA);
     end
     toc
@@ -64,11 +63,14 @@ function main_measurement()
     save_measurement_data(data_filename, x_data, y_data);
         
     plot(x_data, y_data, 'LineWidth', 1)
+    row = dataTipTextRow('Vlnová dĺžka','%{+.3f} nm');
+    p.DataTipTemplate.DataTipRows(1) = row;
+    p.DataTipTemplate.DataTipRows(2).Format = '%{+.3f} dBm';
     xlabel('vlnova dlzka [nm]')
     ylabel('vykon [dBm]')
     title(['Súbor: ', data_filename], 'Interpreter', 'none');
 
-end % <--- KONIEC HLAVNEJ FUNKCIE (Dôležité pre MATLAB)
+end 
 
 %-------------------------- OSA CONTROL FUNCTIONS --------------------------------
 
