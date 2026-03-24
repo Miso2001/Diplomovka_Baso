@@ -1,21 +1,22 @@
 function main_measurement()
     clc;
     clear;
-
-    start_wavelength = 1531.5;
-    stop_wavelength = 1532.5;
-    sample_points = 5001;              
-    resolution = 0.07;
-    video_bandwith = 100;              
-    reference_level = -20;
-    log_scale_div = 5;                  
-    sweep_average_count = 1;
-    storage_mode = 'OFF';               
-    active_trace = 'A';                 
-    trace_type = 'WRITE';
+%-------------------------- PARAMETERS OF OSA --------------------------------
+    start_wavelength = 1531.5;    % [nm] Rozsah: <600..1750> nm
+    stop_wavelength = 1532.5;     % [nm] Rozsah: <600..1750> nm
+    sample_points = 5001;         % Počet bodov     
+    resolution = 0.07;            % [nm]
+    video_bandwith = 100;         % [Hz]    
+    reference_level = -20;        % [dBm]
+    log_scale_div = 5;            % [dB/div]      
+    sweep_average_count = 1;      % Počet spriemerovaní
+    storage_mode = 'OFF';         % Režim ukladania: AVS | OFF     
+    active_trace = 'A';           % Aktívna stopa      
+    trace_type = 'WRITE';         % Typ stopy
 
     span = stop_wavelength - start_wavelength;
 
+%-------------------------- COMMUNICATION WITH OSA -----------------------------
     instrument_OSA = visadev("GPIB0::1::INSTR");
     instrument_OSA.Timeout = 1000;
     idn_OSA = writeread(instrument_OSA, "*IDN?");
@@ -25,6 +26,7 @@ function main_measurement()
     instrument_OSICS.Timeout = 20;
     idn_OSICS = writeread(instrument_OSICS, "*IDN?");
 
+%-------------------------- INIT OSA --------------------------------------
     osa_set_wavelength_range(instrument_OSA, start_wavelength, stop_wavelength); 
     osa_set_sample_points(instrument_OSA, sample_points);  
     osa_set_resolution(instrument_OSA, resolution); 
@@ -36,6 +38,7 @@ function main_measurement()
     osa_trace_select(instrument_OSA, active_trace);
     osa_set_trace_type(instrument_OSA, active_trace, trace_type);
 
+%-------------------------- MEASUREMENT --------------------------------------
     tic
     if strcmp(storage_mode, 'OFF')
         osa_start_measurement(instrument_OSA);
@@ -48,6 +51,7 @@ function main_measurement()
     y_data = osa_get_trace_data(instrument_OSA, active_trace);
     x_data = start_wavelength:(span/(sample_points-1)):stop_wavelength;
 
+% --- FILTROVANIE DÁT ---
     mask = y_data > -60;
     if any(mask)
         x_filtered = x_data(mask);
@@ -62,10 +66,12 @@ function main_measurement()
         fprintf('----------------------\n\n');
     end
 
+% --- DYNAMICKÉ NÁZVY SÚBOROV ---
     timestamp = datestr(now, 'yyyymmdd_HHMMSS');
     settings_filename = ['OSA_Settings_', timestamp, '.txt'];
     data_filename = ['Measurement_data_', timestamp, '.csv'];
 
+% --- UKLADANIE DÁT ---
     save_osa_settings(settings_filename, start_wavelength, stop_wavelength, resolution, reference_level, sweep_average_count);
     save_measurement_data(data_filename, x_data, y_data);
         
@@ -78,6 +84,7 @@ function main_measurement()
     title(['Súbor: ', data_filename], 'Interpreter', 'none');
 end 
 
+%-------------------------- OSA CONTROL FUNCTIONS --------------------------------
 function [] = osa_set_wavelength_range(instrument, start_wl, stop_wl)
     if start_wl >= stop_wl
         disp("ERROR: START WL >= STOP WL");
@@ -166,6 +173,7 @@ function y_data = osa_get_trace_data(instrument,trace)
     writeread(instrument,'*OPC?');
 end
 
+%--------------------------------- SAVING DATA -----------------------------------
 function [] = save_osa_settings(logfile_name, start_wl, stop_wl, resolution, ref_level, sweep_avg_count)
     fileID = fopen(logfile_name, 'w');
     if fileID == -1
