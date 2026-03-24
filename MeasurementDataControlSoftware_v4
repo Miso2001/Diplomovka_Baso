@@ -52,18 +52,33 @@ function main_measurement()
     x_data = start_wavelength:(span/(sample_points-1)):stop_wavelength;
 
 % --- FILTROVANIE DÁT ---
-    mask = y_data > -60;
+mask = y_data > -60;
     if any(mask)
         x_filtered = x_data(mask);
         y_filtered = y_data(mask);
         weights = y_filtered - min(y_filtered); 
-        centroid_x = sum(x_filtered .* weights) / sum(weights);
+        centroid_x = sum(x_filtered .* weights) / sum(weights); % Aktuálna vlnová dĺžka lambda_act
         centroid_y = max(y_filtered);
         
-        fprintf('\n--- ANALÝZA MAXIMA ---\n');
+        % --- VÝPOČET TEPLOTY (Sonda S/N: 115428/0001) ---
+        S1 = 6.008789e-06;
+        S2 = 9.059222e-09;
+        lambda_Tref = 1532.196; % [nm]
+        
+        term1 = 22.5;
+        term2 = S1 / (2 * S2);
+        % MATLAB ekvivalent pre math.sqrt a math.log (prirodzený logaritmus)
+        term3 = sqrt((S1 / (2 * S2))^2 + (1 / S2) * log(centroid_x / lambda_Tref));
+        
+        teplota_C = term1 - term2 + term3;
+
+        % --- VÝPIS DO TERMINÁLU ---
+        fprintf('\n--- ANALÝZA MAXIMA A TEPLOTY ---\n');
+        fprintf('Sonda S/N: 115428 (Konštanty: S1=%.6e, S2=%.6e, L_ref=%.3f nm)\n', S1, S2, lambda_Tref);
         fprintf('Centroid X (vlnová dĺžka): %.6f nm\n', centroid_x);
         fprintf('Maximum Y (výkon): %.3f dBm\n', centroid_y);
-        fprintf('----------------------\n\n');
+        fprintf('Vypočítaná teplota: %.2f °C\n', teplota_C);
+        fprintf('--------------------------------\n\n');
     end
 
 % --- DYNAMICKÉ NÁZVY SÚBOROV ---
