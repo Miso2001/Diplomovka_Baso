@@ -4,15 +4,15 @@ function main_measurement()
 %-------------------------- PARAMETERS OF OSA --------------------------------
     start_wavelength = 1531.5;    % [nm] Rozsah: <600..1750> nm
     stop_wavelength = 1532.5;     % [nm] Rozsah: <600..1750> nm
-    sample_points = 5001;         % Počet bodov     
-    resolution = 0.07;            % [nm]
-    video_bandwith = 100;         % [Hz]    
-    reference_level = -20;        % [dBm]
+    sample_points = 5001;         % Počet bodov  51, 101, 251, 501, 1001, 2001, 5001, 10001, 20001, 50001    
+    resolution = 0.07;            %  0.03|0.05|0.07|0.1|0.2|0.5|1.0 [nm]
+    video_bandwith = 100;         % 10|100|200|1000|2000|10000|100000|1000000 [Hz]    
+    reference_level = -20;        % Reference level  –90.0 to 30.0 [dBm]
     log_scale_div = 5;            % [dB/div]      
-    sweep_average_count = 1;      % Počet spriemerovaní
+    sweep_average_count = 1;      % 1 to 1000
     storage_mode = 'OFF';         % Režim ukladania: AVS | OFF     
-    active_trace = 'A';           % Aktívna stopa      
-    trace_type = 'WRITE';         % Typ stopy
+    active_trace = 'A';           % A to J      
+    trace_type = 'WRITE';         % WRITE|CALC|FIX 
 
     span = stop_wavelength - start_wavelength;
 
@@ -91,9 +91,6 @@ mask = y_data > -60;
     save_measurement_data(data_filename, x_data, y_data);
         
     p = plot(x_data, y_data, 'LineWidth', 1);
-    row = dataTipTextRow('Vlnová dĺžka','%{+.3f} nm');
-    p.DataTipTemplate.DataTipRows(1) = row;
-    p.DataTipTemplate.DataTipRows(2).Format = '%{+.3f} dBm';
     xlabel('vlnova dlzka [nm]')
     ylabel('vykon [dBm]')
     title(['Súbor: ', data_filename], 'Interpreter', 'none');
