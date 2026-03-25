@@ -87,7 +87,14 @@ mask = y_data > -60;
     data_filename = ['Measurement_data_', timestamp, '.csv'];
 
 % --- UKLADANIE DÁT ---
-    save_osa_settings(settings_filename, start_wavelength, stop_wavelength, resolution, reference_level, sweep_average_count);
+settings.start_wavelength = start_wavelength;
+settings.stop_wavelength = stop_wavelength;
+settings.resolution = resolution;
+settings.reference_level = reference_level;
+settings.sweep_average_count = sweep_average_count;
+
+save_osa_settings(settings_filename, settings);
+   function save_osa_settings(filename, settings);
     save_measurement_data(data_filename, x_data, y_data);
         
     p = plot(x_data, y_data, 'LineWidth', 1);
