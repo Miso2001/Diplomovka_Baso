@@ -4,11 +4,11 @@ function main_measurement()
 %-------------------------- PARAMETERS OF OSA --------------------------------
     start_wavelength = 1531.5;    % [nm] Rozsah: <600..1750> nm
     stop_wavelength = 1532.5;     % [nm] Rozsah: <600..1750> nm
-    sample_points = 5001;         % Počet bodov  51, 101, 251, 501, 1001, 2001, 5001, 10001, 20001, 50001    
-    resolution = 0.07;            %  0.03|0.05|0.07|0.1|0.2|0.5|1.0 [nm]
+    sample_points = 251;         % Počet bodov  51, 101, 251, 501, 1001, 2001, 5001, 10001, 20001, 50001    
+    resolution = 0.07;            % 0.03|0.05|0.07|0.1|0.2|0.5|1.0 [nm]
     video_bandwith = 100;         % 10|100|200|1000|2000|10000|100000|1000000 [Hz]    
     reference_level = -20;        % Reference level  –90.0 to 30.0 [dBm]
-    log_scale_div = 5;            % [dB/div]      
+    log_scale_div = 5;            % vertical scale division [dB/div] <0.1...10>     
     sweep_average_count = 1;      % 1 to 1000
     storage_mode = 'OFF';         % Režim ukladania: AVS | OFF     
     active_trace = 'A';           % A to J      
@@ -60,14 +60,19 @@ mask = y_data > -60;
         centroid_x = sum(x_filtered .* weights) / sum(weights); % Aktuálna vlnová dĺžka lambda_act
         centroid_y = max(y_filtered);
         
-        % --- VÝPOČET TEPLOTY (Sonda S/N: 115428/0001) ---
+        % --- KONŠTANTY PRE VÝPOČET TEPLOTY--- 
+        % (Sonda S/N: 115428/0001) 
         S1 = 6.008789e-06;
         S2 = 9.059222e-09;
         lambda_Tref = 1532.196; % [nm]
-        
+
+        % (Sonda S/N: 115427/0001)
+        %S1 = 5.969324E-6;
+        %S2 = 9.096922E-9;
+        %lambda_Tref = 1539.13;
+
         term1 = 22.5;
         term2 = S1 / (2 * S2);
-        % MATLAB ekvivalent pre math.sqrt a math.log (prirodzený logaritmus)
         term3 = sqrt((S1 / (2 * S2))^2 + (1 / S2) * log(centroid_x / lambda_Tref));
         
         teplota_C = term1 - term2 + term3;
@@ -75,7 +80,7 @@ mask = y_data > -60;
         % --- VÝPIS DO TERMINÁLU ---
         fprintf('\n--- ANALÝZA MAXIMA A TEPLOTY ---\n');
         fprintf('Sonda S/N: 115428 (Konštanty: S1=%.6e, S2=%.6e, L_ref=%.3f nm)\n', S1, S2, lambda_Tref);
-        fprintf('Centroid X (vlnová dĺžka): %.6f nm\n', centroid_x);
+        fprintf('Centroid X (vlnová dĺžka): %.4f nm\n', centroid_x);
         fprintf('Maximum Y (výkon): %.3f dBm\n', centroid_y);
         fprintf('Vypočítaná teplota: %.2f °C\n', teplota_C);
         fprintf('--------------------------------\n\n');
@@ -87,7 +92,7 @@ mask = y_data > -60;
     data_filename = ['Measurement_data_', timestamp, '.csv'];
 
 % --- UKLADANIE DÁT ---
-    save_osa_settings(settings_filename, start_wavelength, stop_wavelength, resolution, reference_level, sweep_average_count);
+    save_osa_settings(settings_filename, start_wavelength, stop_wavelength,sample_points, resolution, video_bandwith, reference_level, sweep_average_count);
     save_measurement_data(data_filename, x_data, y_data);
         
     p = plot(x_data, y_data, 'LineWidth', 1);
@@ -186,17 +191,19 @@ function y_data = osa_get_trace_data(instrument,trace)
 end
 
 %--------------------------------- SAVING DATA -----------------------------------
-function [] = save_osa_settings(logfile_name, start_wl, stop_wl, resolution, ref_level, sweep_avg_count)
+function [] = save_osa_settings(logfile_name, start_wl, stop_wl,sample_points, resolution,video_bandwith, ref_level, sweep_avg_count)
     fileID = fopen(logfile_name, 'w');
     if fileID == -1
         error('Nepodarilo sa otvoriť súbor %s', logfile_name);
     end
     fprintf(fileID, '--- OSA Configuration Settings ---\n');
     fprintf(fileID, 'Date and Time: %s\n\n', datestr(now));
-    fprintf(fileID, 'Start Wavelength [nm]: %f\n', start_wl);
-    fprintf(fileID, 'Stop Wavelength [nm]: %f\n', stop_wl);
-    fprintf(fileID, 'Resolution [nm]: %f\n', resolution);
-    fprintf(fileID, 'Reference Level [dBm]: %f\n', ref_level);
+    fprintf(fileID, 'Start Wavelength [nm]: %4.2f\n', start_wl);
+    fprintf(fileID, 'Stop Wavelength [nm]: %4.2f\n', stop_wl);
+    fprintf(fileID, 'Sample points: %.0f\n', sample_points);
+    fprintf(fileID, 'Resolution [nm]: %.2f\n', resolution);
+    fprintf(fileID, 'Video bandwidth [Hz]: %.0f\n', video_bandwith);
+    fprintf(fileID, 'Reference Level [dBm]: %.2f\n', ref_level);
     fprintf(fileID, 'Sweep Average Count: %d\n', sweep_avg_count); 
     fclose(fileID);
     disp(['Nastavenia uložené do: ', logfile_name]);
