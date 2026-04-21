@@ -1,0 +1,57 @@
+% Model Braggovej mriežky cez CMT 
+clear all; 
+close all; 
+clc;
+
+%% 1. Vstupné parametre 
+lambda_b_nm = 1550;         % Braggova vlnová dĺžka [nm]
+n_eff = 1.45;               % Efektívny index lomu
+delta_n = 0.00025;           % Modulácia indexu lomu (napr. 0.0001)
+L_mm = 5;                  % Dĺžka mriežky [mm]
+start_wavelength = 1548;    % Počiatočná vlnová dĺžka [nm]
+stop_wavelength = 1552;     % Konečná vlnová dĺžka [nm]
+body = 1000;                % Počet bodov výpočtu
+
+%% 2. Prevod jednotiek a pomocné výpočty
+% Prevod na metre pre matematické vzorce
+lambda_b = lambda_b_nm * 1e-9;
+L = L_mm * 1e-3;
+start_w = start_wavelength * 1e-9;
+stop_w = stop_wavelength * 1e-9;
+
+kappa = (pi / lambda_b) * delta_n; % Väzbový koeficient
+
+
+krok = (stop_w - start_w) / (body - 1);
+vysledok_lambda_nm = zeros(1, body);
+vysledok_R = zeros(1, body);
+
+%% 3. Výpočet reflektivity bod po bode
+for i = 1:body
+    lambda_m = start_w + (i-1) * krok;                    % Aktuálna vlnová dĺžka v metroch
+    delta = 2 * pi * n_eff * (1/lambda_m - 1/lambda_b);   % Rozladenie (detuning) delta
+    s_sq = kappa^2 - delta^2;
+    sigma_b = sqrt(complex(s_sq));                        % Parameter sigma_b
+    
+    % Výpočet reflektivity R
+    num = kappa^2 * (sinh(sigma_b * L))^2;
+    den = sigma_b^2 * (cosh(sigma_b * L))^2 + delta^2 * (sinh(sigma_b * L))^2;
+    
+    R = abs(num / den);
+    
+    vysledok_lambda_nm(i) = lambda_m * 1e9;
+    vysledok_R(i) = R;
+end
+
+%% 4. Vykreslenie grafu
+figure;
+plot(vysledok_lambda_nm, vysledok_R, 'LineWidth', 1.5, 'Color', [0 0.4470 0.7410]);
+grid on;
+
+title('Spektrum odrazivosti FBG cez model CMT');
+subtitle_text = sprintf('\\lambda_b = %g nm, n_{eff} = %g, \\Delta n = %g, L = %g mm', lambda_b_nm, n_eff, delta_n, L_mm);
+subtitle(subtitle_text);
+xlabel('Vlnová dĺžka [nm]');
+ylabel('Reflektivita [-]');
+
+axis([start_wavelength stop_wavelength 0 1.1]);
