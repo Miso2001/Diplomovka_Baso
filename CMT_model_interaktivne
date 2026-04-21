@@ -1,0 +1,108 @@
+function interaktivna_FBG_reset()
+    % Vytvorenie hlavného okna
+    fig = uifigure('Name', 'FBG Model: CMT + Reset', 'Position', [100 100 950 550]);
+    
+    % Podpora pre koliesko myši
+    set(fig, 'WindowScrollWheelFcn', @mouseWheelCallback);
+
+    % --- DEFINÍCIA PÔVODNÝCH HODNÔT (Default) ---
+    defaults.lb = 1550;
+    defaults.neff = 1.45;
+    defaults.dn = 0.00025;
+    defaults.L = 5;
+    defaults.start = 1548;
+    defaults.stop = 1552;
+
+    % --- UI Komponenty ---
+    panel = uipanel(fig, 'Title', 'Parametre', 'Position', [20 50 260 450]);
+    ax = uiaxes(fig, 'Position', [310 70 600 400]);
+
+    % Pomocná funkcia na vytvorenie ovládacích prvkov
+    function h = vytvorVstup(label, y, val, step, dec)
+        uilabel(panel, 'Position', [10 y 150 22], 'Text', label);
+        h = uieditfield(panel, 'numeric', 'Position', [160 y 80 22], ...
+            'Value', val, 'ValueChangedFcn', @(src,event) aktualizuj());
+        s.step = step; s.decimals = dec;
+        h.UserData = s;
+    end
+
+    % Vytvorenie polí
+    f_lb    = vytvorVstup('Lambda_b [nm]:', 380, defaults.lb, 0.1, 1); 
+    f_neff  = vytvorVstup('n_eff [-]:',     340, defaults.neff, 0.01, 3);
+    f_dn    = vytvorVstup('delta_n [-]:',   300, defaults.dn, 0.00001, 6);
+    f_L     = vytvorVstup('L [mm]:',        260, defaults.L, 0.1, 2);
+    f_start = vytvorVstup('Start [nm]:',    180, defaults.start, 0.2, 2);
+    f_stop  = vytvorVstup('Stop [nm]:',     140, defaults.stop, 0.2, 2);
+
+    % --- TLAČIDLO RESET ---
+    uibutton(panel, 'Text', 'Resetovať hodnoty', ...
+        'Position', [40 40 180 30], ...
+        'ButtonPushedFcn', @(btn,event) resetujHodnoty());
+
+    % Prvé vykreslenie
+    aktualizuj();
+
+    % --- Callback pre Reset ---
+    function resetujHodnoty()
+        f_lb.Value = defaults.lb;
+        f_neff.Value = defaults.neff;
+        f_dn.Value = defaults.dn;
+        f_L.Value = defaults.L;
+        f_start.Value = defaults.start;
+        f_stop.Value = defaults.stop;
+        
+        aktualizuj(); % Po resete prekresli graf
+    end
+
+    % --- Callback pre koliesko myši ---
+    function mouseWheelCallback(src, event)
+        obj = src.CurrentObject;
+        if isa(obj, 'matlab.ui.control.NumericEditField')
+            s = obj.UserData; 
+            if event.VerticalScrollCount > 0
+                val = obj.Value - s.step;
+            else
+                val = obj.Value + s.step;
+            end
+            obj.Value = round(val, s.decimals);
+            aktualizuj();
+        end
+    end
+
+    % --- Výpočtová funkcia ---
+    function aktualizuj()
+        L_b_nm = round(f_lb.Value, f_lb.UserData.decimals);
+        n_e = round(f_neff.Value, f_neff.UserData.decimals);
+        d_n = round(f_dn.Value, f_dn.UserData.decimals);
+        L_m_mm = round(f_L.Value, f_L.UserData.decimals);
+        w_start = f_start.Value;
+        w_stop = f_stop.Value;
+
+        L_b = L_b_nm * 1e-9;
+        L_fbg = L_m_mm * 1e-3;
+        kappa = (pi / L_b) * d_n;
+        
+        v_lambda_nm = linspace(w_start, w_stop, 800);
+        v_R = zeros(1, 800);
+
+        for i = 1:800
+            curr_l = v_lambda_nm(i) * 1e-9;
+            delta = 2 * pi * n_e * (1/curr_l - 1/L_b);
+            sigma = sqrt(complex(kappa^2 - delta^2));
+            num = kappa^2 * (sinh(sigma * L_fbg))^2;
+            den = sigma^2 * (cosh(sigma * L_fbg))^2 + delta^2 * (sinh(sigma * L_fbg))^2;
+            v_R(i) = abs(num / den);
+        end
+
+        plot(ax, v_lambda_nm, v_R, 'LineWidth', 2, 'Color', [0 0.44 0.74]);
+        grid(ax, 'on');
+        title(ax, 'Spektrum odrazivosti FBG cez model CMT');
+        st_txt = sprintf('\\lambda_b = %g nm, n_{eff} = %g, \\Delta n = %g, L = %g mm', ...
+                         L_b_nm, n_e, d_n, L_m_mm);
+        subtitle(ax, st_txt);
+        xlabel(ax, 'Vlnová dĺžka [nm]');
+        ylabel(ax, 'Reflektivita [-]');
+        ylim(ax, [0 1.1]);
+        xlim(ax, [w_start w_stop]);
+    end
+end
